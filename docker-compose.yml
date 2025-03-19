@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        - NO_CACHE=1  # Force rebuild by changing build args
+        - NO_CACHE=1  
     volumes:
       - ./controller.yaml:/app/controller.yaml
       - ./model:/app/model
