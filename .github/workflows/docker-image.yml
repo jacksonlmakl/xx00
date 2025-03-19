@@ -30,7 +30,7 @@ jobs:
         context: .
         file: Dockerfile
         push: true
-        tags: ${{ secrets.DOCKER_HUB_USERNAME }}/my-image-name:latest
+        tags: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ vars.IMAGE_NAME }}:${{ vars.TAG }}
 
     - name: Deploy with Docker Compose
       run: |
