@@ -7,7 +7,6 @@ on:
     branches: [ "main" ]
 
 jobs:
-
   build-and-deploy:
     runs-on: ubuntu-latest
 
@@ -24,6 +23,27 @@ jobs:
         username: ${{ secrets.DOCKER_HUB_USERNAME }}
         password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
+    - name: Validate and Set Environment Variables
+      run: |
+        # Check if IMAGE_NAME and TAG exist in vars, otherwise set defaults
+        IMAGE_NAME=${{ vars.IMAGE_NAME }}
+        TAG=${{ vars.TAG }}
+
+        # Ensure they are not empty
+        if [[ -z "$IMAGE_NAME" || "$IMAGE_NAME" == "null" ]]; then 
+          echo "Error: IMAGE_NAME is empty or not set!" >&2
+          exit 1
+        fi
+
+        if [[ -z "$TAG" || "$TAG" == "null" ]]; then 
+          echo "Error: TAG is empty or not set!" >&2
+          exit 1
+        fi
+
+        echo "Using IMAGE_NAME=$IMAGE_NAME and TAG=$TAG"
+        echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
+        echo "TAG=$TAG" >> $GITHUB_ENV
+
     - name: Build and Push Docker Image
       uses: docker/build-push-action@v5
       with:
@@ -31,8 +51,3 @@ jobs:
         file: Dockerfile
         push: true
         tags: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
-
-    - name: Deploy with Docker Compose
-      run: |
-        docker compose down
-        docker compose up -d --build
