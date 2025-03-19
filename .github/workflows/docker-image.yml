@@ -44,6 +44,19 @@ jobs:
         echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
         echo "TAG=$TAG" >> $GITHUB_ENV
 
+    # ✅ Step 1: Install Dependencies & Build Frontend
+    - name: Install Node.js & Build Frontend
+      run: |
+        sudo apt update
+        sudo apt install -y nodejs npm
+        npm install
+        npm run build
+
+    # ✅ Step 2: Verify `build/` Exists Before Building the Docker Image
+    - name: Verify Build Directory
+      run: ls -la build
+
+    # ✅ Step 3: Build and Push Docker Image (Ensuring `build/` Is Included)
     - name: Build and Push Docker Image
       uses: docker/build-push-action@v5
       with:
