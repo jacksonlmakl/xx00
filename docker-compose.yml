@@ -5,56 +5,17 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        - NO_CACHE=1
+        - NO_CACHE=1  
     volumes:
-      - './controller.yaml:/app/controller.yaml'
-      - './model:/app/model'
+      - ./controller.yaml:/app/controller.yaml
+      - ./model:/app/model
     ports:
-      - '3000:3000'
-      - '5000:5000'
+      - "3000:3000"  # Frontend port
+      - "5000:5000"  # Backend port
+
     environment:
       - NODE_ENV=production
-      - 'REACT_APP_API_URL=http://localhost:5000'
-    privileged: true
+      - REACT_APP_API_URL=http://localhost:5000
+    privileged: true  # Required for Docker-in-Docker
     restart: unless-stopped
     container_name: framework-app
-  framework2:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - NO_CACHE=1
-    volumes:
-      - './controller2.yaml:/app/controller.yaml'
-      - './model2:/app/model'
-    ports:
-      - '4000:3000'
-      - '6000:5000'
-    environment:
-      - NODE_ENV=production
-      - 'REACT_APP_API_URL=http://localhost:5000'
-    privileged: true
-    restart: unless-stopped
-    container_name: framework-app-2
-
-# version: '3.8'
-# services:
-#   framework:
-#     build:
-#       context: .
-#       dockerfile: Dockerfile
-#       args:
-#         - NO_CACHE=1  
-#     volumes:
-#       - ./controller.yaml:/app/controller.yaml
-#       - ./model:/app/model
-#     ports:
-#       - "3000:3000"  # Frontend port
-#       - "5000:5000"  # Backend port
-
-#     environment:
-#       - NODE_ENV=production
-#       - REACT_APP_API_URL=http://localhost:5000
-#     privileged: true  # Required for Docker-in-Docker
-#     restart: unless-stopped
-#     container_name: framework-app
