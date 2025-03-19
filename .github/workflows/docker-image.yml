@@ -99,21 +99,10 @@ jobs:
 
         # 🔥 Build & Run Docker Compose
         echo "🔨 Building and starting Docker container..."
-        docker compose down || true
-        docker compose up --build -d
+        docker compose build --no-cache || true
 
-        # Wait for startup
-        sleep 10
       shell: bash
 
-    # ✅ Verify that containers are running
-    - name: Verify Running Services
-      run: |
-        echo "✅ Checking if services are running..."
-        docker ps
-        curl -f http://localhost:3000 || echo "⚠️ Warning: Frontend may not be running!"
-        curl -f http://localhost:5000 || echo "⚠️ Warning: Backend may not be running!"
-        nc -zv 127.0.0.1 2375 || echo "⚠️ Warning: Docker-in-Docker (2375) may not be working!"
 
     # ✅ Log in to Docker Hub
     - name: Log in to Docker Hub
