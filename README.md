@@ -5,3 +5,7 @@ cd deploy && \
 docker pull jacksonmakl/deploy-framework:latest && \
 docker compose up -d
  ```
+#Build Image
+```
+docker compose build --no-cache && docker compose up -d
+```
