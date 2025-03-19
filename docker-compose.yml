@@ -6,6 +6,8 @@ services:
       dockerfile: Dockerfile
       args:
         - NO_CACHE=1  # Force rebuild by changing build args
+    volumes:
+      - ./model:/app/model
     ports:
       - "3000:3000"  # Frontend port
       - "5000:5000"  # Backend port
