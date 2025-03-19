@@ -4,13 +4,15 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
-      
+
     - name: List Repository Contents
       run: |
         echo "Contents of the repository:"
@@ -18,31 +20,33 @@ jobs:
         
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
-      
+
     - name: Log in to Docker Hub
       uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKER_HUB_USERNAME }}
         password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-        
+
     - name: Validate and Set Environment Variables
       run: |
         # Check if IMAGE_NAME and TAG exist in vars, otherwise set defaults
         IMAGE_NAME=${{ vars.IMAGE_NAME }}
         TAG=${{ vars.TAG }}
-        # Ensure they are not empty
+
         if [[ -z "$IMAGE_NAME" || "$IMAGE_NAME" == "null" ]]; then 
           echo "Error: IMAGE_NAME is empty or not set!" >&2
           exit 1
         fi
+
         if [[ -z "$TAG" || "$TAG" == "null" ]]; then 
           echo "Error: TAG is empty or not set!" >&2
           exit 1
         fi
+
         echo "Using IMAGE_NAME=$IMAGE_NAME and TAG=$TAG"
         echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
         echo "TAG=$TAG" >> $GITHUB_ENV
-        
+
     - name: Build and Push Docker Image
       uses: docker/build-push-action@v5
       with:
@@ -53,7 +57,7 @@ jobs:
         build-args: |
           BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           VCS_REF=${{ github.sha }}
-        
+
     - name: Verify Docker Image
       run: |
         # Pull the image we just pushed
@@ -74,6 +78,113 @@ jobs:
         
         # Clean up
         docker rm $CONTAINER_ID
+
+    # ✅ Install Docker Compose (if needed)
+    - name: Install Docker Compose
+      run: |
+        docker compose version || sudo apt-get update && sudo apt-get install -y docker-compose
+
+    # ✅ Run Docker Compose
+    - name: Start services using Docker Compose
+      run: |
+        docker compose up -d
+        sleep 5  # Give services some time to initialize
+        docker ps  # List running containers for debugging
+
+    # ✅ Verify if the services are running
+    - name: Check running services
+      run: |
+        curl -f http://localhost:3000 || echo "⚠️ Warning: Service on port 3000 might not be up"
+        curl -f http://localhost:5000 || echo "⚠️ Warning: Service on port 5000 might not be up"
+        nc -zv 127.0.0.1 2375 || echo "⚠️ Warning: Port 2375 might not be open"
+
+    # ✅ Clean up Docker Compose services
+    - name: Stop and remove containers
+      run: docker compose down
+
+# name: Docker Compose CI/CD
+# on:
+#   push:
+#     branches: [ "main" ]
+#   pull_request:
+#     branches: [ "main" ]
+# jobs:
+#   build-and-deploy:
+#     runs-on: ubuntu-latest
+#     steps:
+#     - name: Checkout Repository
+#       uses: actions/checkout@v4
+      
+#     - name: List Repository Contents
+#       run: |
+#         echo "Contents of the repository:"
+#         ls -la
+        
+#     - name: Set up Docker Buildx
+#       uses: docker/setup-buildx-action@v3
+      
+#     - name: Log in to Docker Hub
+#       uses: docker/login-action@v3
+#       with:
+#         username: ${{ secrets.DOCKER_HUB_USERNAME }}
+#         password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+        
+#     - name: Validate and Set Environment Variables
+#       run: |
+#         # Check if IMAGE_NAME and TAG exist in vars, otherwise set defaults
+#         IMAGE_NAME=${{ vars.IMAGE_NAME }}
+#         TAG=${{ vars.TAG }}
+#         # Ensure they are not empty
+#         if [[ -z "$IMAGE_NAME" || "$IMAGE_NAME" == "null" ]]; then 
+#           echo "Error: IMAGE_NAME is empty or not set!" >&2
+#           exit 1
+#         fi
+#         if [[ -z "$TAG" || "$TAG" == "null" ]]; then 
+#           echo "Error: TAG is empty or not set!" >&2
+#           exit 1
+#         fi
+#         echo "Using IMAGE_NAME=$IMAGE_NAME and TAG=$TAG"
+#         echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
+#         echo "TAG=$TAG" >> $GITHUB_ENV
+        
+#     - name: Build and Push Docker Image
+#       uses: docker/build-push-action@v5
+#       with:
+#         context: .
+#         file: Dockerfile
+#         push: true
+#         tags: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
+#         build-args: |
+#           BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+#           VCS_REF=${{ github.sha }}
+        
+#     - name: Verify Docker Image
+#       run: |
+#         # Pull the image we just pushed
+#         docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
+        
+#         # Create a container from the image to verify contents
+#         CONTAINER_ID=$(docker create ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.TAG }})
+        
+#         echo "Verifying /app directory contents:"
+#         docker cp $CONTAINER_ID:/app/start.sh ./start.sh.from_container || echo "Could not verify start.sh file"
+        
+#         if [ -f "./start.sh.from_container" ]; then
+#           echo "✅ Verification successful: start.sh exists in the image"
+#           cat ./start.sh.from_container | head -5
+#         else
+#           echo "⚠️ Verification failed: start.sh not found in the image"
+#         fi
+        
+#         # Clean up
+#         docker rm $CONTAINER_ID
+
+
+
+
+
+
+
 
         
 # name: Docker Compose CI/CD
