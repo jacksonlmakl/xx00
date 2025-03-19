@@ -1,0 +1,6 @@
+schedule: '* * * * *'
+s3:
+  - name: ''
+  - access_key: ''
+  - secret_key: ''
+steps: []
