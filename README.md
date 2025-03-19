@@ -33,7 +33,7 @@ cd deploy
 docker compose up -d
 ```
 
-###Public Endpoint
+### Public Endpoint
 ```
 http://<your-endpoint-address-here>:3000
 ```
