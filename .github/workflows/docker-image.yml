@@ -1,4 +1,5 @@
 name: Docker Compose CI/CD
+
 on:
   push:
     branches: [ "main" ]
@@ -13,93 +14,135 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: List Repository Contents
+    - name: Install Docker and Docker Compose
       run: |
-        echo "Contents of the repository:"
-        ls -la
-        
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+        sudo apt-get update
+        sudo apt-get install -y docker.io docker-compose
+        docker --version
+        docker compose version
 
+    # 🔹 Run the setup script inside GitHub Actions
+    - name: Run Setup Script
+      run: |
+        # Set error handling
+        set -e
+        echo "🚀 Framework Application Setup (Frontend + Backend with Docker-in-Docker)"
+        echo "===================================================================="
+
+        # Create main Dockerfile
+        cat > Dockerfile << 'EOF'
+        FROM ubuntu:22.04
+        USER root
+        ENV DEBIAN_FRONTEND=noninteractive
+
+        # Install dependencies
+        RUN apt-get update && \
+            apt-get install -y python3 python3-pip wget curl jq cron git gnupg ca-certificates && \
+            ln -s /usr/bin/python3 /usr/bin/python && \
+            pip3 install --upgrade pip
+
+        # Install Node.js 18.x
+        RUN mkdir -p /etc/apt/keyrings && \
+            curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
+            echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_18.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list && \
+            apt-get update && \
+            apt-get install -y nodejs
+
+        # Verify Node.js and npm
+        RUN node --version && npm --version
+
+        WORKDIR /app
+        RUN git clone --depth=1 "https://github.com/jacksonlmakl/framework.git" /app/
+        RUN cd /app && npm install
+
+        # Set permissions
+        RUN chmod +x /app/bin/run /app/bin/deploy /app/bin/docker-stop /app/bin/docker-logs
+        RUN chmod 666 /app/controller.yaml
+
+        # Start script
+        RUN echo '#!/bin/bash\n\
+        echo "Starting application container..."\n\
+        node /app/server.js & \n\
+        sleep 2\n\
+        cd /app && npm run client & \n\
+        wait' > /app/start.sh && chmod +x /app/start.sh
+
+        EXPOSE 3000 5000 2375
+        CMD ["/app/start.sh"]
+        EOF
+
+        echo "✅ Dockerfile created"
+
+        # Create docker-compose.yml
+        cat > docker-compose.yml << 'EOF'
+        version: '3.8'
+        services:
+          framework:
+            build:
+              context: .
+              dockerfile: Dockerfile
+              args:
+                - NO_CACHE=1
+            ports:
+              - "3000:3000"
+              - "5000:5000"
+              - "2375:2375"
+            environment:
+              - NODE_ENV=production
+              - REACT_APP_API_URL=http://localhost:5000
+            privileged: true
+            restart: unless-stopped
+            container_name: framework-app
+        EOF
+
+        echo "✅ docker-compose.yml created"
+
+        # 🔥 Build & Run Docker Compose
+        echo "🔨 Building and starting Docker container..."
+        docker compose down || true
+        docker compose up --build -d
+
+        # Wait for startup
+        sleep 10
+      shell: bash
+
+    # ✅ Verify that containers are running
+    - name: Verify Running Services
+      run: |
+        echo "✅ Checking if services are running..."
+        docker ps
+        curl -f http://localhost:3000 || echo "⚠️ Warning: Frontend may not be running!"
+        curl -f http://localhost:5000 || echo "⚠️ Warning: Backend may not be running!"
+        nc -zv 127.0.0.1 2375 || echo "⚠️ Warning: Docker-in-Docker (2375) may not be working!"
+
+    # ✅ Log in to Docker Hub
     - name: Log in to Docker Hub
       uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKER_HUB_USERNAME }}
         password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-    - name: Validate and Set Environment Variables
+    # ✅ Push the built image to Docker Hub
+    - name: Push Image to Docker Hub
       run: |
-        # Check if IMAGE_NAME and TAG exist in vars, otherwise set defaults
         IMAGE_NAME=${{ vars.IMAGE_NAME }}
         TAG=${{ vars.TAG }}
-
         if [[ -z "$IMAGE_NAME" || "$IMAGE_NAME" == "null" ]]; then 
           echo "Error: IMAGE_NAME is empty or not set!" >&2
           exit 1
         fi
-
         if [[ -z "$TAG" || "$TAG" == "null" ]]; then 
           echo "Error: TAG is empty or not set!" >&2
           exit 1
         fi
-
         echo "Using IMAGE_NAME=$IMAGE_NAME and TAG=$TAG"
-        echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
-        echo "TAG=$TAG" >> $GITHUB_ENV
 
-    - name: Build and Push Docker Image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: Dockerfile
-        push: true
-        tags: ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
-        build-args: |
-          BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-          VCS_REF=${{ github.sha }}
+        # Tag and push
+        docker tag framework-app ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
+        docker push ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
 
-    - name: Verify Docker Image
-      run: |
-        # Pull the image we just pushed
-        docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
-        
-        # Create a container from the image to verify contents
-        CONTAINER_ID=$(docker create ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.TAG }})
-        
-        echo "Verifying /app directory contents:"
-        docker cp $CONTAINER_ID:/app/start.sh ./start.sh.from_container || echo "Could not verify start.sh file"
-        
-        if [ -f "./start.sh.from_container" ]; then
-          echo "✅ Verification successful: start.sh exists in the image"
-          cat ./start.sh.from_container | head -5
-        else
-          echo "⚠️ Verification failed: start.sh not found in the image"
-        fi
-        
-        # Clean up
-        docker rm $CONTAINER_ID
-
-    # ✅ Install Docker Compose (if needed)
-    - name: Install Docker Compose
-      run: |
-        docker compose version || sudo apt-get update && sudo apt-get install -y docker-compose
-
-    # ✅ Run Docker Compose
-    - name: Start services using Docker Compose
-      run: |
-        docker compose up -d
-        sleep 5  # Give services some time to initialize
-        docker ps  # List running containers for debugging
-
-    # ✅ Verify if the services are running
-    - name: Check running services
-      run: |
-        curl -f http://localhost:3000 || echo "⚠️ Warning: Service on port 3000 might not be up"
-        curl -f http://localhost:5000 || echo "⚠️ Warning: Service on port 5000 might not be up"
-        nc -zv 127.0.0.1 2375 || echo "⚠️ Warning: Port 2375 might not be open"
-
-    # ✅ Clean up Docker Compose services
-    - name: Stop and remove containers
+    # ✅ Cleanup Docker Compose services
+    - name: Cleanup Services
       run: docker compose down
 
 # name: Docker Compose CI/CD
