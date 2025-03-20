@@ -1,24 +1,8 @@
-schedule: "* * * * *"  # Run Every Minute
-s3: 
- - name: ""
- - access_key: ""
- - secret_key: ""
- 
-# steps:
-#  - name: "Replicate"
-#    execute: "replicate.py"
-#    
-#  - name: "Insert"
-#    table: "table.yaml"
-#    execute: "data.json"
-#  
-#  - name: "Transform"
-#    table: "table.yaml"
-#    execute: "table.sql"
-#    
-#  - name: "Execute SQL"
-#    database: "demo"
-#    execute: "test.sql"
-#    
-#  - name: "S3"
-#    execute: "s3"
+schedule: '* * * * *'
+s3:
+  - name: ''
+  - access_key: ''
+  - secret_key: ''
+steps:
+  - name: New Step
+    execute: test.py
